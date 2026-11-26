@@ -7,8 +7,9 @@
 //
 // Outside the grader, MAKEFUN_OUTPUT_DIR stands in for /output.
 
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildDossier } from "./vendor/makefun-frontend.ts";
 
 // The caps the bounty’s gate uses for the dossier: the text cap shapes the
@@ -22,16 +23,25 @@ const DOSSIER_CAPS = {
 
 const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
 
+// The bot's own directory: this file lives at <bot>/main.ts, so the site
+// and its screenshots sit beside it. Paths must never rely on the working
+// directory — the grader runs `node /bot/main.ts` from /.
+const botDir = dirname(fileURLToPath(import.meta.url));
+
 // Start from an empty output directory so a second run cannot inherit
 // stale files from the first: the two runs must write the same bytes.
-if (existsSync(outDir)) {
-  rmSync(outDir, { recursive: true, force: true });
-}
+// Clear the directory's CONTENTS only — deleting the directory itself
+// fails under the grader's user, which cannot write to its parent.
 mkdirSync(outDir, { recursive: true });
+if (existsSync(outDir)) {
+  for (const entry of readdirSync(outDir)) {
+    rmSync(join(outDir, entry), { recursive: true, force: true });
+  }
+}
 
 // The site and its screenshots, copied whole.
-cpSync(join("app"), join(outDir, "app"), { recursive: true });
-cpSync(join("screenshots"), join(outDir, "screenshots"), { recursive: true });
+cpSync(join(botDir, "app"), join(outDir, "app"), { recursive: true });
+cpSync(join(botDir, "screenshots"), join(outDir, "screenshots"), { recursive: true });
 
 // The dossier, byte for byte what buildDossier writes from those files.
 const dossier = buildDossier(outDir, DOSSIER_CAPS);
